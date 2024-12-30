@@ -1,0 +1,7 @@
+.pio
+.vscode
+.DS_Store
+include
+lib
+test
+*.bin

@@ -1,0 +1,103 @@
+
+/*
+div.app{
+    text-align: center;
+    margin-top: 50px;
+}
+div.app_title{
+    font-weight: bold;
+    font-size: x-large;
+}
+*/
+
+.header{
+    height: 100px;
+}
+.footer{
+    text-align: center;
+}
+
+.app {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    background-color: #f9f9f9;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.app_info {
+    display: flex;
+    flex-direction: column;
+}
+
+.app_title, .app_description, .app_version, .app_date {
+    margin: 0;
+    padding: 0 5px;
+}
+
+.app_title{
+    font-weight: bold;
+}
+
+.app_subtitle{
+    font-size: x-small;
+    font-weight: bold;
+}
+
+.esp-web-install-button {
+    margin-left: auto;
+    padding: 5px 10px;
+    background-color: #007bff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.esp-web-install-button:hover {
+    background-color: #0056b3;
+}
+
+.detail {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px;
+    border-radius: 5px;
+    background-color: #ffffff;
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.detail_title{
+    font-weight: bold;
+    font-size: x-small;
+    min-width: 80px;
+    color: gray;
+}
+.detail_description{
+    font-size: x-small;
+    color: gray;
+}
+
+@media (max-width: 600px) {
+    .app {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .esp-web-install-button {
+        margin-left: 0;
+        align-self: center;
+    }
+
+    .app_info {
+        width: 100%;
+        margin-bottom: 10px;
+    }
+}

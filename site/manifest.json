@@ -1,0 +1,14 @@
+{
+    "name": "M5PEasyTag",
+    "version": "S3_v0a7",
+    "funding_url": "https://app.nanana.uno/",
+    "new_install_prompt_erase": true,
+    "builds": [
+      {
+        "chipFamily": "ESP32-S3",
+        "parts": [
+          { "path": "m5peasytag_s3_v0a7.bin", "offset": 0 }
+        ]
+      }
+    ]
+  }
