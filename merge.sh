@@ -15,7 +15,7 @@ MERGE_COMMAND="python3 $ESPTOOL --chip esp32 merge_bin \
 --flash_mode keep \
 --flash_freq keep \
 --flash_size keep \
-0x0100 $BUILD_DIR/$BOOTLOADER \
+0x1000 $BUILD_DIR/$BOOTLOADER \
 0x8000 $BUILD_DIR/$PARTITIONS \
 0xe000 $BOOT \
 0x10000 $BUILD_DIR/$APP \

@@ -32,9 +32,10 @@ div.app_title{
 .app_info {
     display: flex;
     flex-direction: column;
+    gap: 5px;
 }
 
-.app_title, .app_description, .app_version, .app_date {
+.app_title, .app_description, .app_connect {
     margin: 0;
     padding: 0 5px;
 }
@@ -44,8 +45,21 @@ div.app_title{
 }
 
 .app_subtitle{
-    font-size: x-small;
+    font-size: small;
     font-weight: bold;
+    text-align: center;
+}
+
+.app_target, .app_version, .app_date {
+    padding: 5px;
+    border-bottom: 1px solid #ccc;
+    text-align: center;
+}
+
+.app_target:last-of-type, 
+.app_version:last-of-type, 
+.app_date:last-of-type{
+    border-bottom: none;
 }
 
 .esp-web-install-button {
