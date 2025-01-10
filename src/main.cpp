@@ -3,7 +3,9 @@
 #include <SD.h> // Must be put before M5Unified.h
 #include <LittleFS.h>
 #include <M5Unified.h>
-#include <epdiy.h> // Necessary for M5PaperS3
+#if __has_include(<epdiy.h>)
+#include <epdiy.h> // Necessary only for M5PaperS3
+#endif
 #include <SPI.h>
 
 void setup() {
