@@ -64,6 +64,8 @@ void setup() {
     }
   }
 
+  M5.Display.waitDisplay();
+
   // Enter into deep sleep
   M5.Log(esp_log_level_t::ESP_LOG_INFO, "Deep sleep start\n");
   esp_deep_sleep_start();
