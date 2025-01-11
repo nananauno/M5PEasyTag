@@ -7,7 +7,7 @@ Visit [here](https://app.nanana.uno/), connect your M5PaperS3/M5Paper and press 
 [ESP Web Tools](https://esphome.github.io/esp-web-tools/)
 
 ## How to use
-1. Put card.png into a SD card.
+1. Put card.png into an SD card.
 2. Insert the SD card to the M5PaperS3/M5Paper.
 3. Reset/Turn power on
 
