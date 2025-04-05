@@ -32,7 +32,7 @@ You can see additional instructions on the M5PaperS3/M5Paper by turning power on
 
 ### Resetting Device
 To delete saved Wi-Fi credentials and uploaded card image:
-1. Long-press the screen for 2 seconds
+1. Long-press the screen for 2 seconds at the upload screen
 2. The device will display what was deleted
 3. The device will automatically restart
 
