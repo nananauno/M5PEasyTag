@@ -250,18 +250,50 @@ void setup() {
     if(board == m5::board_t::board_M5Paper){
       M5.Display.drawPngFile(LittleFS, "/default.png");
     }else{
-      M5.Display.drawPngFile(LittleFS, "/default_s3.png");
+      M5.Display.drawPngFile(LittleFS, "/default.png");
     }
   }
 
   // Enter into deep sleep
-  //M5.Log(esp_log_level_t::ESP_LOG_INFO, "Deep sleep start\n");
-  //M5.Power.deepSleep();
+  M5.Log(esp_log_level_t::ESP_LOG_INFO, "Deep sleep start\n");
+  M5.Power.deepSleep();
 }
 
 void loop() {
+  M5.update();  // Update button/touch state
+
   if (WiFi.status() == WL_CONNECTED) {
     server.handleClient();
   }
+
+  // Check for long press (2 seconds)
+  static uint32_t pressStartTime = 0;
+  static bool isPressing = false;
+
+  if (M5.Touch.getCount() > 0) {
+    if (!isPressing) {
+      pressStartTime = millis();
+      isPressing = true;
+    } else if ((millis() - pressStartTime) >= 2000) {  // 2 seconds long press
+      // Delete Wi-Fi credentials file and card.png
+      bool wifiDeleted = LittleFS.remove(WIFI_CONFIG_FILE);
+      bool cardDeleted = LittleFS.remove("/card.png");
+      
+      if (wifiDeleted || cardDeleted) {
+        //M5.Display.clearDisplay(WHITE);
+        M5.Display.setCursor(0, 0);
+        M5.Display.println("Removed:");
+        if (wifiDeleted) M5.Display.println("- Wi-Fi credential");
+        if (cardDeleted) M5.Display.println("- Card image");
+        M5.Display.display();
+        delay(2000);  // Show message for 2 seconds
+        ESP.restart();  // Reboot
+      }
+      isPressing = false;  // Reset press state
+    }
+  } else {
+    isPressing = false;  // Reset press state when touch is released
+  }
+
   delay(10);
 }
