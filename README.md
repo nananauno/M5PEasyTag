@@ -30,6 +30,12 @@ Visit [here](https://app.nanana.uno/), connect your M5PaperS3/M5Paper and press 
 
 You can see additional instructions on the M5PaperS3/M5Paper by turning power on without SD card.
 
+### Resetting Device
+To delete saved Wi-Fi credentials and uploaded card image:
+1. Long-press the screen for 2 seconds
+2. The device will display what was deleted
+3. The device will automatically restart
+
 ## v0a12
 Add M5Paper support.
 ## v0a7
