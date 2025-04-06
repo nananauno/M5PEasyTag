@@ -36,6 +36,8 @@ To delete saved Wi-Fi credentials and uploaded card image:
 2. The device will display what was deleted
 3. The device will automatically restart
 
+## v1a0
+Add Wi-Fi support with ESPTouch for uploading card image.
 ## v0a12
 Add M5Paper support.
 ## v0a7
