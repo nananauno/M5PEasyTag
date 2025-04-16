@@ -226,6 +226,7 @@ void setup() {
       M5.Display.drawPngFile(LittleFS, "/waiting.png");
       M5.Display.display();
       return;
+
     }
   }
   
