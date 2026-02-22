@@ -2,6 +2,7 @@
 
 BUILD_DIR=".pio/build/PaperS3"
 OUTPUT_FILE="merged-firmware.bin"
+PIO_PYTHON="~/.platformio/penv/bin/python"
 ESPTOOL="~/.platformio/packages/tool-esptoolpy/esptool.py"
 
 BOOTLOADER="bootloader.bin"
@@ -10,7 +11,7 @@ BOOT="~/.platformio/packages/framework-arduinoespressif32/tools/partitions/boot_
 LITTLEFS="littlefs.bin"
 APP="firmware.bin"
 
-MERGE_COMMAND="python3 $ESPTOOL --chip esp32-s3 merge_bin \
+MERGE_COMMAND="$PIO_PYTHON $ESPTOOL --chip esp32-s3 merge_bin \
 -o $BUILD_DIR/$OUTPUT_FILE \
 --flash_mode keep \
 --flash_freq keep \
