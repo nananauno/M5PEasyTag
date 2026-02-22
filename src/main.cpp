@@ -11,6 +11,18 @@
 #include <epdiy.h> // Necessary only for M5PaperS3
 #endif
 #include <SPI.h>
+#include <Preferences.h>
+#include "gallery.h"
+
+// App mode
+enum class AppMode {
+  Uploading,
+  Gallery
+};
+AppMode currentMode = AppMode::Uploading;
+
+// NVS
+Preferences prefs;
 
 WebServer server(80);
 
@@ -129,6 +141,7 @@ void setup() {
   M5.begin();
   // Get wakeup reason
   esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+  M5.Log.setLogLevel(m5::log_target_display, ESP_LOG_INFO);
   M5.Log(esp_log_level_t::ESP_LOG_INFO, "Wakeup reason: %d\n", wakeup_reason);
 
   // Get board info
@@ -141,13 +154,23 @@ void setup() {
   M5.Display.setFont(&fonts::FreeMonoBold12pt7b);
   M5.Display.clearDisplay(WHITE);
   M5.Display.setTextSize(1);
-  M5.Display.setTextColor(BLACK);
+  M5.Display.setTextColor(BLACK, WHITE);
+
+  // NVS for card data
+  if (!prefs.begin("m5ptag", false)) {
+    M5.Display.println("NVS init .. NG");
+    delay(2000);
+    esp_restart();
+  }
 
   // Initialize LittleFS
   if (!LittleFS.begin()) {
     M5.Display.println("LittleFS init .. NG");
     esp_restart();
   }
+
+  // Show menu.png
+  M5.Display.drawPngFile(LittleFS, "/menu.png");
 
   // Get SPI pins
   auto mosi = M5.getPin(m5::pin_name_t::sd_spi_mosi);
@@ -163,21 +186,29 @@ void setup() {
   }
 
   // Show tap message for Wi-Fi setup
-  M5.Display.println("Tap for Wi-Fi Setup");
+  M5.Display.println("Select mode:");
+  M5.Display.println("Will be displayed the card image if no touch input within 5 seconds.");
   
   // Wait for 3 seconds and check for touch input
   unsigned long startTime = millis();
   bool touchDetected = false;
-  while (millis() - startTime < 3000) {
+  while (millis() - startTime < 5000) {
     M5.update();
     if (M5.Touch.getCount()) {
       touchDetected = true;
+      // Touched at upper side, enter Wi-Fi setup mode, otherwise enter gallery mode
+      auto touch = M5.Touch.getDetail(0);
+      if (touch.y < M5.Display.height() / 2) {
+        currentMode = AppMode::Uploading;
+      } else {
+        currentMode = AppMode::Gallery;
+      }
       break;
     }
     delay(100);
   }
 
-  if (touchDetected) {
+  if (touchDetected && currentMode == AppMode::Uploading) {
     // First try to connect using saved credentials if they exist
     String saved_ssid, saved_password;
     if (loadWiFiCredentials(saved_ssid, saved_password)) {
@@ -224,20 +255,30 @@ void setup() {
       // Display waiting image and return to loop
       M5.Display.clearDisplay(WHITE);
       M5.Display.drawPngFile(LittleFS, "/waiting.png");
-      M5.Display.display();
+      M5.Display.waitDisplay();
       return;
+
     }
   }
   
   // If no touch detected or ESPTouch failed, turn off WiFi
   WiFi.mode(WIFI_OFF);
 
+  // If gallery mode, show thumbnails and return to loop
+  if(currentMode == AppMode::Gallery){
+    showThumbnails();
+    return;
+  }
+
+  // Load card path from NVS
+  String cardPath = prefs.getString("card_path", "");
+
   // Set EPD mode to High quality mode
   M5.Display.setEpdMode(epd_mode_t::epd_quality);
   // Try to display image from SD card first
   M5.Display.clearDisplay(WHITE);
   M5.Display.setRotation(2); // Upside down for M5PaperS3
-  bool success = M5.Display.drawPngFile(SD, "/card.png");
+  bool success = M5.Display.drawPngFile(SD, cardPath.c_str());
 
   // If SD card image not found, try LittleFS
   if (!success) {
@@ -261,6 +302,19 @@ void setup() {
 
 void loop() {
   M5.update();  // Update button/touch state
+
+  if(currentMode == AppMode::Gallery){
+    String selectedCardPath = selectFromGallery();
+    // Save selected card path to NVS
+    prefs.putString("card_path", selectedCardPath);
+    // This is for future use to skip menu when rebooting.
+    //prefs.putString("reboot_reason", "selected");
+    M5.Display.setCursor(0, 0);
+    M5.Display.println("Selected: " + selectedCardPath);
+    delay(2000);
+    // Restart to display selected image
+    esp_restart();
+  }
 
   if (WiFi.status() == WL_CONNECTED) {
     server.handleClient();
