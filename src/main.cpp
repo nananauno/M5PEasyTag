@@ -293,7 +293,6 @@ void setup() {
       }
 
       canvas.fillSprite(WHITE);
-      ledStartBlink(1, CRGB::Aqua);
       bool cardOk = canvas.drawPngFile(SD, cardPath);
 
       if (!cardOk) {
@@ -317,6 +316,7 @@ void setup() {
       }
 
       // Success — display image
+      ledStartBlink(1, CRGB::Aqua);
       canvas.pushSprite(0, 0);
       M5.Display.waitDisplay();
       ledStopBlink(1);
