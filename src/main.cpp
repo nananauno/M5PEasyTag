@@ -295,7 +295,6 @@ void setup() {
       canvas.fillSprite(WHITE);
       ledStartBlink(1, CRGB::Aqua);
       bool cardOk = canvas.drawPngFile(SD, cardPath);
-      ledStopBlink(1);
 
       if (!cardOk) {
         // Show error at bottom of screen without clearing menu image
@@ -320,9 +319,10 @@ void setup() {
       // Success — display image
       canvas.pushSprite(0, 0);
       M5.Display.waitDisplay();
+      ledStopBlink(1);
       // Both LEDs yellow for 1 second before sleep
-      leds[0] = CRGB::Yellow; leds[1] = CRGB::Yellow; FastLED.show();
-      delay(1000);
+      leds[0] = CRGB::Yellow; leds[1] = CRGB::Yellow; FastLED.show();  // LED2 aqua → yellow here
+      delay(2000);
       leds[0] = CRGB::Black; leds[1] = CRGB::Black; FastLED.show();
       M5.Power.deepSleep();
     }
