@@ -16,7 +16,7 @@ On startup, the menu image is displayed. Press one of the three buttons to selec
 - **Button B**: Display `/card2.png`
 - **Button C**: Display `/card3.png`
 
-The selected image is rendered in high quality and the device enters deep sleep.
+The selected image is rendered and the device enters deep sleep.
 
 #### If a card file is not found
 An error message is shown at the bottom of the menu screen along with the missing file path.  
@@ -83,6 +83,9 @@ To delete saved Wi-Fi credentials and uploaded card image:
 3. The device will automatically restart
 
 ## Version History
+
+### v3a1
+- Support PaperColor
 
 ### v2a0
 - Support multiple card images
