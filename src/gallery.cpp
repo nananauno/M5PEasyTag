@@ -1,35 +1,44 @@
 #include "gallery.h"
 
-// Grid configuration
-#define GRID_COLS  2
-#define GRID_ROWS  2
-#define CELL_W     (540 / GRID_COLS)   // 270
-#define CELL_H     (960 / GRID_ROWS)   // 480
+extern M5Canvas canvas;
 
-const char* cardPathPrefix = "/card"; // Base path for card images
-const char* cardPathSuffix = ".png"; // File extension for card images
+#define GRID_COLS   2
+#define GRID_ROWS   2
+#define TOTAL_CARDS (GRID_COLS * GRID_ROWS)
 
-void showThumbnails() {
+const char* cardPathPrefix = "/card";
+const char* cardPathSuffix = ".png";
+
+void showThumbnails(int selectedIndex) {
+  int cellW = M5.Display.width() / GRID_COLS;
+  int cellH = M5.Display.height() / GRID_ROWS;
+
   M5.Display.setEpdMode(epd_mode_t::epd_quality);
-  M5.Display.clearDisplay(WHITE);
+  canvas.fillSprite(WHITE);
 
-  for (int i = 0; i < GRID_COLS * GRID_ROWS; i++) {
+  for (int i = 0; i < TOTAL_CARDS; i++) {
     int col = i % GRID_COLS;
     int row = i / GRID_COLS;
-    int x = col * CELL_W;
-    int y = row * CELL_H;
+    int x   = col * cellW;
+    int y   = row * cellH;
 
     String cardPath = String(cardPathPrefix) + String(i + 1) + String(cardPathSuffix);
     if (SD.exists(cardPath)) {
-      M5.Display.drawPngFile(SD, cardPath.c_str(), x, y, CELL_W, CELL_H, 0, 0, 0.5, 0.5);
+      canvas.drawPngFile(SD, cardPath.c_str(), x, y, cellW, cellH, 0, 0, 0.5, 0.5);
     } else {
-      // Draw placeholder if image doesn't exist
-      M5.Display.fillRect(x, y, CELL_W, CELL_H, LIGHTGREY);
-      M5.Display.setCursor(x + 10, y + 10);
-      M5.Display.setTextColor(BLACK);
-      M5.Display.print("No Image");
+      canvas.fillRect(x, y, cellW, cellH, LIGHTGREY);
+      canvas.setCursor(x + 10, y + 10);
+      canvas.setTextColor(BLACK, LIGHTGREY);
+      canvas.print("No Image");
+    }
+
+    if (i == selectedIndex) {
+      canvas.drawRect(x + 2, y + 2, cellW - 4, cellH - 4, BLACK);
+      canvas.drawRect(x + 3, y + 3, cellW - 6, cellH - 6, BLACK);
     }
   }
+
+  canvas.pushSprite(0, 0);
 }
 
 String selectFromGallery() {
@@ -38,13 +47,14 @@ String selectFromGallery() {
 
     auto t = M5.Touch.getDetail(0);
     if (t.wasReleased()) {
-      int col = t.x / CELL_W;
-      int row = t.y / CELL_H;
-      int idx = row * GRID_COLS + col;
-      
-      if (idx >= 0 && idx < (GRID_COLS * GRID_ROWS)) {
-        String cardPath = String(cardPathPrefix) + String(idx + 1) + String(cardPathSuffix);
+      int cellW = M5.Display.width() / GRID_COLS;
+      int cellH = M5.Display.height() / GRID_ROWS;
+      int col   = t.x / cellW;
+      int row   = t.y / cellH;
+      int idx   = row * GRID_COLS + col;
 
+      if (idx >= 0 && idx < TOTAL_CARDS) {
+        String cardPath = String(cardPathPrefix) + String(idx + 1) + String(cardPathSuffix);
         if (SD.exists(cardPath.c_str())) {
           return cardPath;
         }

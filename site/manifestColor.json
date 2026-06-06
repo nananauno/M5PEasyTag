@@ -1,0 +1,14 @@
+{
+    "name": "M5PEasyTag",
+    "version": "Color_v3a1",
+    "funding_url": "https://nanana.uno/apps/",
+    "new_install_prompt_erase": true,
+    "builds": [
+      {
+        "chipFamily": "ESP32-S3",
+        "parts": [
+          { "path": "m5peasytag_color_v3a1.bin", "offset": 0 }
+        ]
+      }
+    ]
+  }

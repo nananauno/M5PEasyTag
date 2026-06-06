@@ -8,7 +8,37 @@ Visit [here](https://nanana.uno/apps/), connect your M5PaperS3/M5Paper and press
 
 ## How to use
 
-### Bootup menu
+### M5PaperColor
+
+#### Bootup menu
+On startup, the menu image is displayed. Press one of the three buttons to select a card image from the SD card:
+- **Button A**: Display `/card1.png`
+- **Button B**: Display `/card2.png`
+- **Button C**: Display `/card3.png`
+
+The selected image is rendered in high quality and the device enters deep sleep.
+
+#### If a card file is not found
+An error message is shown at the bottom of the menu screen along with the missing file path.  
+Check if the file exists on the SD card.
+
+#### LED indicators
+Two NeoPixel LEDs are connected to pin 21.
+
+| LED | State | Meaning |
+|-----|-------|---------|
+| LED 1 (left) | Green (blinking) | Menu image loading / EPD refreshing |
+| LED 1 (left) | Green (solid) | Ready — waiting for button input |
+| LED 2 (right) | Cyan (blinking) | Card image loading from SD card |
+| LED 2 (right) | Red (solid) | Card file not found |
+| Both LEDs | Yellow (1 second) | Image displayed successfully — entering deep sleep |
+| Both LEDs | Off | Deep sleep |
+
+---
+
+### M5PaperS3 / M5Paper
+
+#### Bootup menu
 On startup, the device waits for 5 seconds for a touch input to determine the mode:
 - **Tap the upper half**: Enter Wi-Fi upload mode
 - **Tap the lower half**: Enter gallery mode
