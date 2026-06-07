@@ -15,8 +15,9 @@
 #include "gallery.h"
 #ifdef PAPERCOLOR
 #include <FastLED.h>
-#define LED_PIN  21
-#define NUM_LEDS 2
+#define LED_PIN   21
+#define NUM_LEDS  2
+#define BTNC_PIN  1   // BtnC GPIO pin (M5PaperColor)
 CRGB leds[NUM_LEDS];
 
 struct BlinkTaskParams {
@@ -70,6 +71,10 @@ enum class AppMode {
 };
 AppMode currentMode = AppMode::Uploading;
 
+#ifdef PAPERCOLOR
+bool paperColorWifiMode = false;
+#endif
+
 // NVS
 Preferences prefs;
 
@@ -119,9 +124,13 @@ bool startSmartConfig() {
   WiFi.mode(WIFI_AP_STA);
   WiFi.beginSmartConfig();
 
+#ifdef PAPERCOLOR
+  ledStartBlink(0, CRGB::Blue); // Blue blink = ESPTouch waiting
+#else
   canvas.println("Waiting for ESPTouch");
   canvas.println("Use ESPTouch App");
   canvas.pushSprite(0, 0);
+#endif
 
   // Wait for SmartConfig packet from mobile
   int attempts = 0;
@@ -129,6 +138,10 @@ bool startSmartConfig() {
     delay(500);
     attempts++;
   }
+
+#ifdef PAPERCOLOR
+  ledStopBlink(0);
+#endif
 
   if (!WiFi.smartConfigDone()) {
     return false;
@@ -148,22 +161,19 @@ bool startSmartConfig() {
   return false;
 }
 
+// Flag set by upload handler, read by completion handler
+static bool uploadSuccess = false;
+// Flag to trigger delayed restart after response is sent
+static bool pendingRestart = false;
+
 // Handle image upload
 void handleUpload() {
-  if (server.method() != HTTP_POST) {
-    server.send(405, "text/plain", "Method Not Allowed");
-    return;
-  }
-
   HTTPUpload& upload = server.upload();
   static File file;
 
   if (upload.status == UPLOAD_FILE_START) {
+    uploadSuccess = false;
     file = LittleFS.open("/card.png", "w");
-    if (!file) {
-      server.send(500, "text/plain", "Failed to open file for writing");
-      return;
-    }
   } else if (upload.status == UPLOAD_FILE_WRITE) {
     if (file) {
       file.write(upload.buf, upload.currentSize);
@@ -171,24 +181,62 @@ void handleUpload() {
   } else if (upload.status == UPLOAD_FILE_END) {
     if (file) {
       file.close();
-      server.send(200, "text/plain", "File uploaded successfully");
-      ESP.restart();
-    } else {
-      server.send(500, "text/plain", "Failed to upload file");
+      uploadSuccess = true;
     }
   }
 }
 
+// Completion handler — called once after all chunks are received
+void handleUploadComplete() {
+  if (uploadSuccess) {
+    server.send(200, "text/plain", "File uploaded successfully");
+    pendingRestart = true;
+  } else {
+    server.send(500, "text/plain", "Failed to upload file");
+  }
+}
+
+#ifdef PAPERCOLOR
+// Display /card.png (LittleFS) at full quality then deep sleep
+void showCardAndSleep() {
+  canvas.fillSprite(WHITE);
+  ledStartBlink(1, CRGB::Aqua);
+  canvas.drawPngFile(LittleFS, "/card.png");
+  canvas.pushSprite(0, 0);
+  M5.Display.waitDisplay();
+  ledStopBlink(1);
+  leds[0] = CRGB::Yellow; leds[1] = CRGB::Yellow; FastLED.show();
+  delay(2000);
+  leds[0] = CRGB::Black;  leds[1] = CRGB::Black;  FastLED.show();
+  M5.Power.deepSleep();
+}
+#endif
+
 // Setup upload form
 void handleRoot() {
-  String html = "<form method='POST' action='/upload' enctype='multipart/form-data'>"
-                "<input type='file' name='image' accept='image/png'>"
-                "<input type='submit' value='Upload'>"
-                "</form>";
-  server.send(200, "text/html", html);
+  File file = LittleFS.open("/index.html", "r");
+  if (!file) {
+    server.send(404, "text/plain", "index.html not found");
+    return;
+  }
+  server.streamFile(file, "text/html");
+  file.close();
 }
 
 void setup() {
+#ifdef PAPERCOLOR
+  // Detect BtnC before M5Unified init for reliable early detection
+  pinMode(BTNC_PIN, INPUT_PULLUP);
+  bool wifiUploadMode = (digitalRead(BTNC_PIN) == LOW);
+
+  // Light up LED immediately so the user knows the device is powered on
+  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
+  FastLED.setBrightness(64);
+  leds[0] = wifiUploadMode ? CRGB::Blue : CRGB::Green;
+  leds[1] = CRGB::Black;
+  FastLED.show();
+#endif
+
   // Initialize M5Unified
   auto cfg = M5.config();
   cfg.clear_display = false;
@@ -199,14 +247,6 @@ void setup() {
 
   // Get board info
   auto board = M5.getBoard();
-
-#ifdef PAPERCOLOR
-  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
-  FastLED.setBrightness(64);
-  leds[0] = CRGB::Green;
-  leds[1] = CRGB::Black;
-  FastLED.show();
-#endif
 
   // Set EPD mode
 #ifdef PAPERCOLOR
@@ -248,8 +288,7 @@ void setup() {
   // Show menu — draw all elements to canvas, then push once
   canvas.fillSprite(WHITE);
 #ifdef PAPERCOLOR
-  canvas.drawPngFile(LittleFS, "/menu_pc.png");
-  // menu_pc.png already contains the button guide
+  canvas.drawPngFile(LittleFS, wifiUploadMode ? "/menu_pc_wifi.png" : "/menu_pc.png");
   ledStartBlink(0, CRGB::Green);
   canvas.pushSprite(0, 0);
   M5.Display.waitDisplay();
@@ -280,7 +319,45 @@ void setup() {
   // Mode selection
   bool inputDetected = false;
 #ifdef PAPERCOLOR
-  {
+  if (wifiUploadMode) {
+    // --- WiFi upload mode ---
+    String saved_ssid, saved_password;
+    if (loadWiFiCredentials(saved_ssid, saved_password)) {
+      ledStartBlink(0, CRGB::Yellow); // Yellow blink = connecting with saved creds
+      WiFi.begin(saved_ssid.c_str(), saved_password.c_str());
+      int attempts = 0;
+      while (WiFi.status() != WL_CONNECTED && attempts < 20) {
+        delay(500);
+        attempts++;
+      }
+      ledStopBlink(0);
+    }
+
+    if (WiFi.status() != WL_CONNECTED) {
+      if (!startSmartConfig()) {
+        ledSet(0, CRGB::Red);
+        delay(2000);
+        ESP.restart();
+      }
+    }
+
+    if (WiFi.status() == WL_CONNECTED) {
+      ledSet(0, CRGB::Blue); // Blue solid = connected, server running
+      if (MDNS.begin("m5paper")) {
+        MDNS.addService("http", "tcp", 80);
+      }
+      server.on("/", HTTP_GET, handleRoot);
+      server.on("/upload", HTTP_POST, handleUploadComplete, handleUpload);
+      server.begin();
+      paperColorWifiMode = true;
+      return; // Enter loop() to handle clients
+    } else {
+      ledSet(0, CRGB::Red);
+      delay(2000);
+      ESP.restart();
+    }
+  } else {
+    // --- Normal card selection mode ---
     const char* cardPath = nullptr;
     while (true) {
       // Wait for button input
@@ -296,7 +373,6 @@ void setup() {
       bool cardOk = canvas.drawPngFile(SD, cardPath);
 
       if (!cardOk) {
-        // Show error at bottom of screen without clearing menu image
         ledSet(0, CRGB::Green);
         ledSet(1, CRGB::Red);
         canvas.fillSprite(WHITE);
@@ -309,19 +385,17 @@ void setup() {
         canvas.pushSprite(0, 0);
         M5.Display.waitDisplay();
 
-        // Reset for retry
         ledSet(1, CRGB::Black);
         cardPath = nullptr;
         continue;
       }
 
-      // Success — display image
+      // Success — display image and sleep
       ledStartBlink(1, CRGB::Aqua);
       canvas.pushSprite(0, 0);
       M5.Display.waitDisplay();
       ledStopBlink(1);
-      // Both LEDs yellow for 1 second before sleep
-      leds[0] = CRGB::Yellow; leds[1] = CRGB::Yellow; FastLED.show();  // LED2 aqua → yellow here
+      leds[0] = CRGB::Yellow; leds[1] = CRGB::Yellow; FastLED.show();
       delay(2000);
       leds[0] = CRGB::Black; leds[1] = CRGB::Black; FastLED.show();
       M5.Power.deepSleep();
@@ -386,7 +460,7 @@ void setup() {
         MDNS.addService("http", "tcp", 80);
       }
       server.on("/", HTTP_GET, handleRoot);
-      server.on("/upload", HTTP_POST, []() {}, handleUpload);
+      server.on("/upload", HTTP_POST, handleUploadComplete, handleUpload);
       server.begin();
 
       canvas.fillSprite(WHITE);
@@ -447,7 +521,35 @@ void setup() {
 void loop() {
   M5.update();
 
-#ifndef PAPERCOLOR
+#ifdef PAPERCOLOR
+  if (paperColorWifiMode) {
+    server.handleClient();
+
+    // Upload complete: show card.png and sleep
+    if (pendingRestart) {
+      showCardAndSleep();
+    }
+
+    // BtnA or BtnB short press: show card.png and sleep
+    if (M5.BtnA.wasReleased() || M5.BtnB.wasReleased()) {
+      showCardAndSleep();
+    }
+
+    // BtnC long press (2s): reset Wi-Fi credentials
+    static uint32_t btnPressStart = 0;
+    if (M5.BtnC.isPressed()) {
+      if (btnPressStart == 0) btnPressStart = millis();
+      else if (millis() - btnPressStart >= 2000) {
+        LittleFS.remove(WIFI_CONFIG_FILE);
+        leds[0] = CRGB::Green; leds[1] = CRGB::Green; FastLED.show();
+        delay(1000);
+        ESP.restart();
+      }
+    } else {
+      btnPressStart = 0;
+    }
+  }
+#else
   if (currentMode == AppMode::Gallery) {
     String selectedCardPath = selectFromGallery();
     prefs.putString("card_path", selectedCardPath);
@@ -461,6 +563,10 @@ void loop() {
 
   if (WiFi.status() == WL_CONNECTED) {
     server.handleClient();
+    if (pendingRestart) {
+      delay(500); // Give the response time to reach the client
+      ESP.restart();
+    }
   }
 
   // Check for long press (2 seconds) to reset credentials

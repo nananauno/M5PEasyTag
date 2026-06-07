@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M5PEasyTag</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #1e3a8a;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .card {
+      background: white;
+      color: #333;
+      border-radius: 12px;
+      padding: 28px 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+    }
+    h1 { margin: 0 0 12px; font-size: 1.55rem; }
+    p { margin: 0 0 16px; color: #555; }
+    .drop-zone {
+      border: 3px dashed #3b82f6;
+      border-radius: 12px;
+      padding: 32px 20px;
+      margin: 12px 0;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .drop-zone.dragover {
+      background: #eff6ff;
+      border-color: #1e40af;
+    }
+    .filename {
+      margin: 8px 0 12px;
+      padding: 8px 12px;
+      background: #f8fafc;
+      border-radius: 6px;
+      min-height: 1.2em;
+      font-size: 0.93rem;
+      color: #1e40af;
+      word-break: break-all;
+    }
+    .preview {
+      margin: 12px 0;
+      max-height: none;           /* 無制限 */
+      width: 100%;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: #f8fafc;
+    }
+    .preview img {
+      max-width: 100%;
+      max-height: none;           /* 全体を表示 */
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+    .btn {
+      background: #1e40af;
+      color: white;
+      border: none;
+      padding: 14px 32px;
+      border-radius: 50px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      width: 100%;
+      margin: 8px 0;
+    }
+    .btn:disabled { background: #94a3b8; cursor: not-allowed; }
+    .status { margin-top: 12px; min-height: 1.5em; font-size: 0.95rem; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>M5PEasyTag</h1>
+    <p id="description">画像をアップロード。PNGファイルのみ。<br>推奨解像度：Paper/PaperS3 960×540 pixels, PaperColor 600×400 pixels</p>
+
+    <div id="dropZone" class="drop-zone">
+      <p id="dropText">画像をドラッグ＆ドロップ<br>またはタップして選択</p>
+      <input type="file" id="fileInput" accept="image/png,image/jpeg" style="display:none;">
+    </div>
+
+    <div id="filename" class="filename">ファイルが選択されていません</div>
+
+    <div id="preview" class="preview">
+      <p id="previewPlaceholder" style="color:#94a3b8; margin:0;">プレビューがここに表示されます</p>
+    </div>
+
+    <button id="uploadBtn" class="btn" disabled>📤 Upload</button>
+    <div id="status" class="status"></div>
+  </div>
+
+  <script>
+    const drop = document.getElementById('dropZone');
+    const input = document.getElementById('fileInput');
+    const btn = document.getElementById('uploadBtn');
+    const status = document.getElementById('status');
+    const desc = document.getElementById('description');
+    const dropText = document.getElementById('dropText');
+    const filenameDisplay = document.getElementById('filename');
+    const preview = document.getElementById('preview');
+    const previewPlaceholder = document.getElementById('previewPlaceholder');
+    let file = null;
+
+    function setLanguage() {
+      const isJa = navigator.language.toLowerCase().startsWith('ja');
+      if (isJa) {
+        desc.innerHTML = '画像をアップロード。PNGファイルのみ。<br>推奨解像度：Paper/PaperS3 960×540 pixels, PaperColor 600×400 pixels';
+        dropText.innerHTML = '画像をドラッグ＆ドロップ<br>またはタップして選択';
+        btn.textContent = 'アップロード';
+        filenameDisplay.textContent = 'ファイルが選択されていません';
+        previewPlaceholder.textContent = 'プレビューがここに表示されます';
+      } else {
+        desc.innerHTML = 'Upload image. PNG files only.<br>Recommended resolution: Paper/PaperS3 960×540 px, PaperColor 600×400 px';
+        dropText.innerHTML = 'Drag & drop image here<br>or tap to select';
+        btn.textContent = 'Upload';
+        filenameDisplay.textContent = 'No file selected';
+        previewPlaceholder.textContent = 'Preview will appear here';
+      }
+    }
+    setLanguage();
+
+    drop.addEventListener('click', () => input.click());
+    input.addEventListener('change', e => e.target.files[0] && handleFile(e.target.files[0]));
+
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+    drop.addEventListener('drop', e => {
+      e.preventDefault();
+      drop.classList.remove('dragover');
+      e.dataTransfer.files[0] && handleFile(e.dataTransfer.files[0]);
+    });
+
+    function handleFile(f) {
+      if (!f.type.startsWith('image/')) {
+        const isJa = navigator.language.toLowerCase().startsWith('ja');
+        status.textContent = isJa ? '⚠️ 画像のみ対応' : '⚠️ Image files only';
+        return;
+      }
+      file = f;
+      filenameDisplay.textContent = f.name;
+
+      const reader = new FileReader();
+      reader.onload = ev => {
+        preview.innerHTML = `<img src="${ev.target.result}" alt="preview">`;
+      };
+      reader.readAsDataURL(f);
+
+      btn.disabled = false;
+      status.textContent = '';
+    }
+
+    btn.addEventListener('click', async () => {
+      if (!file) return;
+      const fd = new FormData();
+      fd.append('image', file);
+
+      btn.disabled = true;
+      const isJa = navigator.language.toLowerCase().startsWith('ja');
+      status.textContent = isJa ? 'アップロード中...' : 'Uploading...';
+
+      try {
+        const res = await fetch('/upload', { method: 'POST', body: fd });
+        if (res.ok) {
+          status.innerHTML = '✅ <strong>' + (isJa ? '成功！' : 'Success!') + '</strong>';
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          status.textContent = isJa ? '❌ 失敗' : '❌ Failed';
+        }
+      } catch(e) {
+        status.textContent = isJa ? '❌ 通信エラー' : '❌ Connection error';
+      }
+      btn.disabled = false;
+    });
+  </script>
+</body>
+</html>
