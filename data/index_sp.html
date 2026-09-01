@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>M5PEasyTag + Spectra6 減色ツール</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      background: #1e3a8a;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+    }
+    .card {
+      background: white;
+      color: #333;
+      border-radius: 12px;
+      padding: 28px 24px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+    }
+    h1 { margin: 0 0 12px; font-size: 1.55rem; color: #1e40af; }
+    p { margin: 0 0 16px; color: #555; }
+    
+    .drop-zone {
+      border: 3px dashed #3b82f6;
+      border-radius: 12px;
+      padding: 32px 20px;
+      margin: 12px 0;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .drop-zone.dragover {
+      background: #eff6ff;
+      border-color: #1e40af;
+    }
+    .filename {
+      margin: 8px 0 12px;
+      padding: 8px 12px;
+      background: #f8fafc;
+      border-radius: 6px;
+      min-height: 1.2em;
+      font-size: 0.93rem;
+      color: #1e40af;
+      word-break: break-all;
+    }
+    .preview {
+      margin: 12px 0;
+      width: 100%;
+      border: 2px solid #ddd;
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: #f8fafc;
+    }
+    .preview img, canvas {
+      max-width: 100%;
+      height: auto;
+      object-fit: contain;
+      display: block;
+    }
+
+    .btn {
+      background: #1e40af;
+      color: white;
+      border: none;
+      padding: 14px 32px;
+      border-radius: 50px;
+      font-size: 1.1rem;
+      cursor: pointer;
+      width: 100%;
+      margin: 8px 0;
+    }
+    .btn:disabled { background: #94a3b8; cursor: not-allowed; }
+    .status { margin-top: 12px; min-height: 1.5em; font-size: 0.95rem; }
+
+    /* 減色ツール用スタイル */
+    .controls { margin: 15px 0; text-align: left; font-size: 0.95rem; }
+    .controls fieldset {
+      border: 1px solid #ddd;
+      border-radius: 8px;
+      padding: 8px 12px;
+      margin: 8px 0;
+    }
+    .slider { margin: 12px 0; }
+    label { margin-right: 8px; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>M5PEasyTag + Spectra6 減色</h1>
+    <p id="description">画像をアップロード → 減色処理 → デバイスへアップロード<br>
+    PaperColor (Spectra6) 対応</p>
+
+    <div id="dropZone" class="drop-zone">
+      <p id="dropText">画像をドラッグ＆ドロップ<br>またはタップして選択</p>
+      <input type="file" id="fileInput" accept="image/*" style="display:none;">
+    </div>
+
+    <div id="filename" class="filename">ファイルが選択されていません</div>
+
+    <div id="preview" class="preview">
+      <p id="previewPlaceholder" style="color:#94a3b8; margin:0;">プレビューがここに表示されます</p>
+    </div>
+
+    <!-- 減色コントロール -->
+    <div id="halftoneControls" class="controls" style="display:none;">
+      <strong>処理モード：</strong><br>
+      <div style="display:flex; gap:12px; flex-wrap:wrap; margin-top:8px;">
+        <fieldset style="flex:1; min-width:140px;">
+          <legend style="color:#ffcc66; font-size:0.85em;">イラスト向け</legend>
+          <label><input type="radio" name="mode" value="nearest" checked> Nearest</label><br>
+          <label><input type="radio" name="mode" value="fifty"> 50% Grid</label>
+        </fieldset>
+        <fieldset style="flex:1; min-width:140px;">
+          <legend style="color:#99ccff; font-size:0.85em;">写真向け</legend>
+          <label><input type="radio" name="mode" value="bayer"> Bayer</label><br>
+          <label><input type="radio" name="mode" value="floyd"> Floyd-Steinberg</label>
+        </fieldset>
+      </div>
+
+      <!-- 白/黒クリッピング -->
+      <div class="slider" id="whiteClipping">
+        <strong>白クリッピング</strong><br>
+        <label>閾値: <span id="whiteVal">230</span></label><br>
+        <input type="range" id="whiteThreshold" min="100" max="255" value="230" step="1" style="width:100%;">
+      </div>
+      <div class="slider" id="blackClipping">
+        <strong>黒クリッピング</strong><br>
+        <label>閾値: <span id="blackVal">30</span></label><br>
+        <input type="range" id="blackThreshold" min="0" max="200" value="30" step="1" style="width:100%;">
+      </div>
+
+      <button onclick="processImage()" class="btn" style="background:#ff6699; margin-top:10px;">🐾 ディザリング実行</button>
+      <button onclick="downloadPNG()" class="btn" style="background:#ff6699;">📥 PNG保存</button>
+    </div>
+
+    <button id="uploadBtn" class="btn" disabled>📤 デバイスへアップロード</button>
+    <div id="status" class="status"></div>
+
+    <p style="margin-top:20px; font-size:0.85rem; color:#666;">Made by NANANA and agent KOKO🦊</p>
+  </div>
+
+  <script>
+    // ====================== 元の M5PEasyTag 部分 ======================
+    const drop = document.getElementById('dropZone');
+    const input = document.getElementById('fileInput');
+    const btn = document.getElementById('uploadBtn');
+    const status = document.getElementById('status');
+    const filenameDisplay = document.getElementById('filename');
+    const preview = document.getElementById('preview');
+    const previewPlaceholder = document.getElementById('previewPlaceholder');
+    const halftoneControls = document.getElementById('halftoneControls');
+
+    let file = null;
+    let originalData = null;
+    let currentProcessed = null;
+    let mainCanvas, mainCtx;
+
+    // ====================== Spectra6 減色ツール 部分 ======================
+    const palette = [
+      {name: "Black",  rgb: [0,   0,   0]},
+      {name: "White",  rgb: [255,255,255]},
+      {name: "Red",    rgb: [255, 0,   0]},
+      {name: "Yellow", rgb: [255,255,  0]},
+      {name: "Blue",   rgb: [0,   0, 255]},
+      {name: "Green",  rgb: [0, 255,   0]}
+    ];
+
+    const whiteSlider = document.getElementById('whiteThreshold');
+    const blackSlider = document.getElementById('blackThreshold');
+    const whiteVal = document.getElementById('whiteVal');
+    const blackVal = document.getElementById('blackVal');
+
+    whiteSlider.addEventListener('input', () => whiteVal.textContent = whiteSlider.value);
+    blackSlider.addEventListener('input', () => blackVal.textContent = blackSlider.value);
+
+    function updateClippingVisibility() {
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+      const show = (mode === 'nearest' || mode === 'fifty');
+      document.getElementById('whiteClipping').style.display = show ? '' : 'none';
+      document.getElementById('blackClipping').style.display = show ? '' : 'none';
+    }
+    document.querySelectorAll('input[name="mode"]').forEach(r => r.addEventListener('change', updateClippingVisibility));
+    updateClippingVisibility();
+
+    // ====================== 共通関数 ======================
+    function colorDistance(a, b) {
+      return Math.hypot(a[0]-b[0], a[1]-b[1], a[2]-b[2]);
+    }
+
+    function findClosest(rgb) {
+      let best = palette[0].rgb, minD = Infinity;
+      for (let p of palette) {
+        const d = colorDistance(rgb, p.rgb);
+        if (d < minD) { minD = d; best = p.rgb; }
+      }
+      return best;
+    }
+
+    function findTwoClosest(rgb) {
+      let sorted = [...palette].sort((a,b) => colorDistance(rgb, a.rgb) - colorDistance(rgb, b.rgb));
+      return [sorted[0].rgb, sorted[1].rgb];
+    }
+
+    function applyClipping(data) {
+      const whiteTh = parseInt(whiteSlider.value);
+      const blackTh = parseInt(blackSlider.value);
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i+1], b = data[i+2];
+        if (r >= whiteTh && g >= whiteTh && b >= whiteTh) {
+          data[i] = data[i+1] = data[i+2] = 255;
+        } else if (r <= blackTh && g <= blackTh && b <= blackTh) {
+          data[i] = data[i+1] = data[i+2] = 0;
+        }
+      }
+    }
+
+    function applyNearest(data, w, h) {
+      applyClipping(data);
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i], g = data[i+1], b = data[i+2];
+        if ((r === 255 && g === 255 && b === 255) || (r === 0 && g === 0 && b === 0)) continue;
+        const [nr,ng,nb] = findClosest([r,g,b]);
+        data[i] = nr; data[i+1] = ng; data[i+2] = nb;
+      }
+    }
+
+    function applyFifty(data, w, h) {
+      applyClipping(data);
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          const r = data[i], g = data[i+1], b = data[i+2];
+          if ((r === 255 && g === 255 && b === 255) || (r === 0 && g === 0 && b === 0)) continue;
+          const [colorA, colorB] = findTwoClosest([r,g,b]);
+          const chosen = ((x + y) % 2 === 0) ? colorA : colorB;
+          data[i] = chosen[0]; data[i+1] = chosen[1]; data[i+2] = chosen[2];
+        }
+      }
+    }
+
+    function applyBayer(data, w, h) {
+      const bayerMatrix = [[0,8,2,10],[12,4,14,6],[3,11,1,9],[15,7,13,5]];
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          let [r,g,b] = [data[i], data[i+1], data[i+2]];
+          const thresh = bayerMatrix[y%4][x%4] * 16 - 128;
+          const [nr,ng,nb] = findClosest([r + thresh, g + thresh, b + thresh]);
+          data[i] = nr; data[i+1] = ng; data[i+2] = nb;
+        }
+      }
+    }
+
+    function applyFloyd(data, w, h) {
+      for (let y = 0; y < h; y++) {
+        for (let x = 0; x < w; x++) {
+          const i = (y * w + x) * 4;
+          const old = [data[i], data[i+1], data[i+2]];
+          const neu = findClosest(old);
+          data[i] = neu[0]; data[i+1] = neu[1]; data[i+2] = neu[2];
+          const err = [old[0]-neu[0], old[1]-neu[1], old[2]-neu[2]];
+          if (x+1 < w) addError(data, i+4, err, 7/16);
+          if (y+1 < h) {
+            if (x-1 >= 0) addError(data, ((y+1)*w + (x-1))*4, err, 3/16);
+            addError(data, ((y+1)*w + x)*4, err, 5/16);
+            if (x+1 < w) addError(data, ((y+1)*w + (x+1))*4, err, 1/16);
+          }
+        }
+      }
+    }
+
+    function addError(data, idx, err, mul) {
+      data[idx]   = Math.min(255, Math.max(0, data[idx]   + err[0]*mul));
+      data[idx+1] = Math.min(255, Math.max(0, data[idx+1] + err[1]*mul));
+      data[idx+2] = Math.min(255, Math.max(0, data[idx+2] + err[2]*mul));
+    }
+
+    function processImage() {
+      if (!originalData) return alert("画像をアップロードしてね");
+      const data = new Uint8ClampedArray(originalData.data);
+      const w = mainCanvas.width;
+      const h = mainCanvas.height;
+      const mode = document.querySelector('input[name="mode"]:checked').value;
+
+      if (mode === "nearest") applyNearest(data, w, h);
+      else if (mode === "bayer") applyBayer(data, w, h);
+      else if (mode === "floyd") applyFloyd(data, w, h);
+      else if (mode === "fifty") applyFifty(data, w, h);
+
+      mainCtx.putImageData(new ImageData(data, w, h), 0, 0);
+      currentProcessed = data;
+    }
+
+    function downloadPNG() {
+      if (!currentProcessed) return alert("先に「ディザリング実行」を押してね");
+      const link = document.createElement('a');
+      link.download = 'spectra6_card.png';
+      link.href = mainCanvas.toDataURL('image/png');
+      link.click();
+    }
+
+    // ====================== アップロード処理 ======================
+    function createMainCanvas(w, h) {
+      if (mainCanvas) return;
+      mainCanvas = document.createElement('canvas');
+      mainCanvas.width = w;
+      mainCanvas.height = h;
+      mainCtx = mainCanvas.getContext('2d');
+      preview.innerHTML = '';
+      preview.appendChild(mainCanvas);
+    }
+
+    function handleFile(f) {
+      if (!f.type.startsWith('image/')) {
+        status.textContent = '⚠️ 画像のみ対応';
+        return;
+      }
+      file = f;
+      filenameDisplay.textContent = f.name;
+
+      const reader = new FileReader();
+      reader.onload = ev => {
+        const img = new Image();
+        img.onload = () => {
+          let w = img.width, h = img.height;
+          const maxW = 340;  // カード幅に収まるように調整
+          if (w > maxW) { h = Math.floor(h * maxW / w); w = maxW; }
+
+          createMainCanvas(w, h);
+          mainCtx.drawImage(img, 0, 0, w, h);
+          originalData = mainCtx.getImageData(0, 0, w, h);
+          currentProcessed = null;
+
+          halftoneControls.style.display = 'block';
+          btn.disabled = false;
+        };
+        img.src = ev.target.result;
+      };
+      reader.readAsDataURL(f);
+      status.textContent = '';
+    }
+
+    // イベント設定
+    drop.addEventListener('click', () => input.click());
+    input.addEventListener('change', e => e.target.files[0] && handleFile(e.target.files[0]));
+
+    drop.addEventListener('dragover', e => { e.preventDefault(); drop.classList.add('dragover'); });
+    drop.addEventListener('dragleave', () => drop.classList.remove('dragover'));
+    drop.addEventListener('drop', e => {
+      e.preventDefault();
+      drop.classList.remove('dragover');
+      e.dataTransfer.files[0] && handleFile(e.dataTransfer.files[0]);
+    });
+
+    btn.addEventListener('click', async () => {
+      if (!file) return;
+      const uploadFile = currentProcessed ? 
+        await new Promise(resolve => mainCanvas.toBlob(resolve, 'image/png')) : 
+        file;
+
+      const fd = new FormData();
+      fd.append('image', uploadFile, currentProcessed ? 'spectra6_' + file.name : file.name);
+
+      btn.disabled = true;
+      status.textContent = 'アップロード中...';
+
+      try {
+        const res = await fetch('/upload', { method: 'POST', body: fd });
+        if (res.ok) {
+          status.innerHTML = '✅ <strong>成功！</strong>';
+          setTimeout(() => location.reload(), 1500);
+        } else {
+          status.textContent = '❌ 失敗';
+        }
+      } catch(e) {
+        status.textContent = '❌ 通信エラー';
+      }
+      btn.disabled = false;
+    });
+  </script>
+</body>
+</html>
